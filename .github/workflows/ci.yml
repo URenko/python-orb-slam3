@@ -21,7 +21,7 @@ jobs:
             container: quay.io/pypa/musllinux_1_2_x86_64
             artifact-name: linux-musl
           - runner: windows-latest
-          - runner: macos-13
+          - runner: macos-26
           - runner: macos-latest
 
     defaults:
@@ -115,14 +115,9 @@ jobs:
           #   container: quay.io/pypa/musllinux_1_2_x86_64
           #   artifact-name: linux-musl
           - runner: windows-latest
-          - runner: macos-13
+          - runner: macos-26
           - runner: macos-latest
-        python: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
-        exclude:
-          - os: macos-latest
-            python: "3.8"
-          - os: macos-latest
-            python: "3.9"
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
       fail-fast: false
 
     defaults:
@@ -203,14 +198,9 @@ jobs:
           #   container: quay.io/pypa/musllinux_1_2_x86_64
           #   artifact-name: linux-musl
           - runner: windows-latest
-          - runner: macos-13
+          - runner: macos-26
           - runner: macos-latest
-        python: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
-        exclude:
-          - os: macos-latest
-            python: "3.8"
-          - os: macos-latest
-            python: "3.9"
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
       fail-fast: false
 
     defaults:
