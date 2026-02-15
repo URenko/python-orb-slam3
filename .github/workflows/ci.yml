@@ -173,7 +173,21 @@ jobs:
       - name: Setup Unix environment
         if: steps.msvc-env.conclusion == 'skipped'
         run: |
-          echo "OpenCV_DIR=$(pwd)/opencv/lib/cmake/opencv4" >> $GITHUB_ENV
+          if [ -d "./opencv/lib64/cmake/opencv4" ]; then
+            CV_DIR="./opencv/lib64/cmake/opencv4"
+          elif [ -d "./opencv/lib/cmake/opencv4" ]; then
+            CV_DIR="./opencv/lib/cmake/opencv4"
+          else
+            CV_CONFIG=$(find ./opencv -type f \( -name OpenCVConfig.cmake -o -name opencv-config.cmake \) | head -n 1)
+            if [ -z "$CV_CONFIG" ]; then
+              echo "OpenCVConfig.cmake not found under ./opencv"
+              find ./opencv -maxdepth 4 -type d -print
+              exit 1
+            fi
+            CV_DIR="$(dirname "$CV_CONFIG")"
+          fi
+
+          echo "OpenCV_DIR=$(realpath "$CV_DIR")" >> $GITHUB_ENV
           echo "OpenCV_STATIC=ON" >> $GITHUB_ENV
 
       - name: Build wheel
@@ -235,13 +249,16 @@ jobs:
           echo "$PYTHONPATH" >> $GITHUB_PATH
           echo "$PYTHONPATH/bin" >> $GITHUB_PATH
           echo "LD_LIBRARY_PATH=$PYTHONPATH/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> $GITHUB_ENV
-          echo "pythonLocation=$PYTHONPATH" >> $GITHUB_ENVd
+          echo "pythonLocation=$PYTHONPATH" >> $GITHUB_ENV
           echo "PKG_CONFIG_PATH=$PYTHONPATH/lib/pkgconfig" >> $GITHUB_ENV
 
       - name: Install dependencies
         run: |
           pdm install -G test --no-self
-          pdm add -v dist/*.whl --frozen-lockfile
+          if ! pdm run python -m pip --version; then
+            pdm run python -m ensurepip --upgrade
+          fi
+          pdm run python -m pip install -v dist/*.whl
 
       - name: Run tests
         run: |
