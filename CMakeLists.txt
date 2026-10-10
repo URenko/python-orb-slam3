@@ -15,6 +15,21 @@ include_directories(${pybind11_INCLUDE_DIRS})
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
+if(WIN32)
+    # OpenCV 5's Windows static package lists pthread in INTERFACE_LINK_LIBRARIES
+    # (x64/vc*/staticlib/OpenCVModules.cmake). MSVC has no pthread.lib, so drop
+    # it for the consumer link. Linux/macOS keep it as-is.
+    foreach(_ocv_tgt IN ITEMS zlib libclapack opencv_core opencv_flann opencv_geometry opencv_imgproc opencv_features opencv_calib opencv_video)
+        if(TARGET ${_ocv_tgt})
+            get_target_property(_ocv_libs ${_ocv_tgt} INTERFACE_LINK_LIBRARIES)
+            if(_ocv_libs)
+                list(FILTER _ocv_libs EXCLUDE REGEX "pthread")
+                set_target_properties(${_ocv_tgt} PROPERTIES INTERFACE_LINK_LIBRARIES "${_ocv_libs}")
+            endif()
+        endif()
+    endforeach()
+endif()
+
 file(GLOB_RECURSE ORB_SLAM3_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.h
