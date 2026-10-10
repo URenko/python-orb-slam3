@@ -50,9 +50,15 @@
  *
  */
 
-#include <opencv2/core/core.hpp>
-#include <opencv2/features2d/features2d.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
+// OpenCV 5 renamed features2d -> features (old header kept as shim).
+// Prefer the new header when available, fall back for OpenCV 4.
+#if __has_include(<opencv2/features.hpp>)
+#include <opencv2/features.hpp>
+#else
+#include <opencv2/features2d.hpp>
+#endif
 #include <vector>
 #include <iostream>
 
