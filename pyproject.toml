@@ -4,7 +4,7 @@ authors = [{ name = "Mix", email = "32300164+mnixry@users.noreply.github.com" }]
 license = { text = "GPL-3.0" }
 requires-python = "<4.0,>=3.8"
 dependencies = ["opencv-python>=4"]
-version = "0.1.1"
+version = "0.1.2"
 description = "A Python wrapper of ORB-SLAM3 feature extraction algorithm."
 readme = "README.md"
 

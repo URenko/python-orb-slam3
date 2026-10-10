@@ -21,7 +21,6 @@ jobs:
             container: quay.io/pypa/musllinux_1_2_x86_64
             artifact-name: linux-musl
           - runner: windows-latest
-          - runner: macos-26
           - runner: macos-latest
 
     defaults:
@@ -30,6 +29,10 @@ jobs:
 
     env:
       SCCACHE_GHA_ENABLED: true
+      # Floor for macOS wheels (tag macosx_14_0_arm64, installable on 14+).
+      # Must be set for both the OpenCV and the wheel builds so the static
+      # libs and the extension share the same min-version; ignored elsewhere.
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
 
     runs-on: ${{ matrix.os.runner }}
     container: ${{ matrix.os.container }}
@@ -48,14 +51,9 @@ jobs:
           repository: opencv/opencv
           ref: ${{ steps.latest-release.outputs.tag }}
 
-      - uses: seanmiddleditch/gha-setup-ninja@master
-        id: setup-ninja
-        if: matrix.os.artifact-name != 'linux-musl'
-
-      - name: Manually install ninja
-        if: steps.setup-ninja.conclusion == 'skipped'
-        run: apk add samurai
-
+      # Default CMake generators are used (Makefiles on Linux/macOS, Visual
+      # Studio on Windows) so no ninja setup is needed. This also avoids
+      # actions stuck on the deprecated Node 20 runtime.
       - uses: mozilla-actions/sccache-action@main
 
       - uses: ilammy/msvc-dev-cmd@v1
@@ -74,7 +72,6 @@ jobs:
           cd build
 
           cmake .. \
-            -D CMAKE_GENERATOR=Ninja \
             -D CMAKE_INSTALL_PREFIX=../opencv \
             -D CMAKE_BUILD_TYPE=Release \
             -D CMAKE_C_COMPILER_LAUNCHER=sccache \
@@ -94,7 +91,7 @@ jobs:
             -D WITH_PNG=OFF \
             -D WITH_TIFF=OFF
 
-          cmake --build . --target install --parallel $(nproc)
+          cmake --build . --target install --parallel $(nproc) --config Release
 
       - uses: actions/upload-artifact@main
         with:
@@ -115,10 +112,14 @@ jobs:
           #   container: quay.io/pypa/musllinux_1_2_x86_64
           #   artifact-name: linux-musl
           - runner: windows-latest
-          - runner: macos-26
           - runner: macos-latest
         python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
       fail-fast: false
+
+    env:
+      # Must match build-opencv so the extension links cleanly against the
+      # static OpenCV libs; wheels are tagged macosx_14_0_arm64.
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
 
     defaults:
       run:
@@ -154,13 +155,8 @@ jobs:
           echo "pythonLocation=$PYTHONPATH" >> $GITHUB_ENV
           echo "PKG_CONFIG_PATH=$PYTHONPATH/lib/pkgconfig" >> $GITHUB_ENV
 
-      - uses: seanmiddleditch/gha-setup-ninja@master
-        id: setup-ninja
-        if: matrix.os.artifact-name != 'linux-musl'
-
-      - name: Manually install ninja
-        if: steps.setup-ninja.conclusion == 'skipped'
-        run: apk add samurai
+          # Wheel builds use the ninja Python package from the isolated build
+          # env (see pdm_build.py), so no system ninja is needed here.
 
       - name: Setup Windows environment
         id: msvc-env
@@ -212,9 +208,10 @@ jobs:
           #   container: quay.io/pypa/musllinux_1_2_x86_64
           #   artifact-name: linux-musl
           - runner: windows-latest
-          - runner: macos-26
           - runner: macos-latest
-        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        # 3.10 tests skipped: test-env refresh (numpy>=2.3) requires >=3.11;
+        # 3.10 wheels are still built and released.
+        python: ["3.11", "3.12", "3.13", "3.14"]
       fail-fast: false
 
     defaults:
@@ -258,9 +255,10 @@ jobs:
           if ! pdm run python -m pip --version; then
             pdm run python -m ensurepip --upgrade
           fi
-          # opencv-python 4.10 segfaults on `import cv2` with Python 3.14 on
-          # Windows; use 4.11+ (still 4.x to avoid 5.x surprises in tests).
-          pdm run python -m pip install -U "opencv-python>=4.11,<5"
+          # Locked opencv 4.10 / numpy 2.2 predate Python 3.14 and segfault on
+          # `import cv2` on Windows; refresh both to versions with real
+          # cp314 wheels.
+          pdm run python -m pip install -U "opencv-python>=4.11" "numpy>=2.3"
           pdm run python -m pip install -v dist/*.whl
 
       - name: Run tests
@@ -282,7 +280,7 @@ jobs:
       - name: Merge wheels
         run: |
           mkdir dist
-          cp -v wheel-*/*.whl dist/
+          cp -f -v wheel-*/*.whl dist/
 
       - uses: actions/upload-artifact@main
         with:
@@ -313,7 +311,9 @@ jobs:
 
       - name: Build sdist
         run: |
-          pdm build --no-wheel
+          # NOTE: --no-clean is required; pdm build wipes ./dist by default,
+          # which would delete the wheels downloaded above.
+          pdm build --no-wheel --no-clean
 
       - name: Upload to GitHub Release
         env:
